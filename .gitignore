@@ -1,0 +1,7 @@
+pretrained_weights/
+exp/
+cityscapes/
+VOC2012/
+coco/
+
+__pycache__/
