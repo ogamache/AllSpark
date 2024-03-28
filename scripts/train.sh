@@ -13,9 +13,9 @@ now=$(date +"%Y%m%d_%H%M%S")
 ## 3. for 'coco' select: ['1_512', '1_256', '1_128', '1_32']
 
 
-dataset='pascal'
+dataset='cityscapes'
 method='allspark'
-split='1_4'
+split='1_16'
 
 
 config=configs/${dataset}_${method}.yaml
@@ -25,10 +25,12 @@ save_path=exp/$dataset/$method/$split
 
 mkdir -p $save_path
 
-python -m torch.distributed.launch \
-    --nproc_per_node=$1 \
-    --master_addr=localhost \
-    --master_port=$2 \
-    train_$method.py \
+# python3 -m torch.distributed.launch \
+#     --nproc_per_node=$1 \
+#     --master_addr=localhost \
+#     --master_port=$2 \
+export LOCAL_RANK=0
+export PYTHONPATH=..
+python3 train_$method.py \
     --config=$config --labeled-id-path $labeled_id_path --unlabeled-id-path $unlabeled_id_path \
-    --save-path $save_path --port $2 2>&1 | tee $save_path/$now.log
+    --save-path $save_path 2>&1 | tee $save_path/$now.log

@@ -23,7 +23,7 @@ parser.add_argument('--labeled-id-path', type=str, required=True)
 parser.add_argument('--unlabeled-id-path', type=str, required=True)
 parser.add_argument('--save-path', type=str, required=True)
 parser.add_argument('--local_rank', default=0, type=int)
-parser.add_argument('--port', default=None, type=int)
+# parser.add_argument('--port', default=None, type=int, required=False)
 
 
 def main():
@@ -34,7 +34,9 @@ def main():
     logger = init_log('global', logging.INFO)
     logger.propagate = 0
 
-    rank, world_size = setup_distributed(port=args.port)
+    # rank, world_size = setup_distributed(port=args.port)
+    rank = 0
+    world_size = 1
 
     if rank == 0:
         all_args = {**cfg, **vars(args), 'ngpus': world_size}
@@ -56,11 +58,11 @@ def main():
         logger.info('Total params: {:.1f}M\n'.format(count_params(model)))
 
     local_rank = int(os.environ["LOCAL_RANK"])
-    model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+    model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model) #OG
     model.cuda()
 
-    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[local_rank],
-                                                      output_device=local_rank, find_unused_parameters=False)
+    # model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[local_rank], #OG
+    #                                                   output_device=local_rank, find_unused_parameters=False)
 
     if cfg['criterion']['name'] == 'CELoss':
         criterion_l = nn.CrossEntropyLoss(**cfg['criterion']['kwargs']).cuda(local_rank)
@@ -70,22 +72,22 @@ def main():
         raise NotImplementedError('%s criterion is not implemented' % cfg['criterion']['name'])
 
     criterion_u = nn.CrossEntropyLoss(**cfg['criterion_u']['kwargs']).cuda(local_rank)
-
+    
     trainset_u = SemiDataset(cfg['dataset'], cfg['data_root'], 'train_u',
                              cfg['crop_size'], args.unlabeled_id_path)
     trainset_l = SemiDataset(cfg['dataset'], cfg['data_root'], 'train_l',
                              cfg['crop_size'], args.labeled_id_path, nsample=len(trainset_u.ids))
     valset = SemiDataset(cfg['dataset'], cfg['data_root'], 'val')
 
-    trainsampler_l = torch.utils.data.distributed.DistributedSampler(trainset_l)
+    # trainsampler_l = torch.utils.data.distributed.DistributedSampler(trainset_l)
     trainloader_l = DataLoader(trainset_l, batch_size=cfg['batch_size'],
-                               pin_memory=True, num_workers=1, drop_last=True, sampler=trainsampler_l)
-    trainsampler_u = torch.utils.data.distributed.DistributedSampler(trainset_u)
+                               pin_memory=True, num_workers=1, drop_last=True)
+    # trainsampler_u = torch.utils.data.distributed.DistributedSampler(trainset_u)
     trainloader_u = DataLoader(trainset_u, batch_size=cfg['batch_size'],
-                               pin_memory=True, num_workers=1, drop_last=True, sampler=trainsampler_u)
-    valsampler = torch.utils.data.distributed.DistributedSampler(valset)
+                               pin_memory=True, num_workers=1, drop_last=True)
+    # valsampler = torch.utils.data.distributed.DistributedSampler(valset)
     valloader = DataLoader(valset, batch_size=1, pin_memory=True, num_workers=1,
-                           drop_last=False, sampler=valsampler)
+                           drop_last=False)
 
     total_iters = len(trainloader_u) * cfg['epochs']
     previous_best = 0.0
@@ -112,12 +114,12 @@ def main():
         total_loss_x = AverageMeter()
         total_loss_u = AverageMeter()
 
-        trainloader_l.sampler.set_epoch(epoch)
-        trainloader_u.sampler.set_epoch(epoch)
+        # trainloader_l.sampler.set_epoch(epoch)
+        # trainloader_u.sampler.set_epoch(epoch)
 
         loader = zip(trainloader_l, trainloader_u)
 
-        model.module.decoder.set_SMem_status(epoch=epoch, isVal=False)
+        model.decoder.set_SMem_status(epoch=epoch, isVal=False)
 
         for i, ((img_x, mask_x), img_u_s) in enumerate(loader):
 
@@ -127,9 +129,9 @@ def main():
             with torch.no_grad():
                 model.eval()
                 pred_u_pseudo = model(img_u_s).detach()
-                model.module.decoder.set_pseudo_prob_map(pred_u_pseudo)
+                model.decoder.set_pseudo_prob_map(pred_u_pseudo)
                 pseudo_label = pred_u_pseudo.argmax(dim=1)
-                model.module.decoder.set_pseudo_label(pseudo_label)
+                model.decoder.set_pseudo_label(pseudo_label)
 
 
             model.train()
@@ -142,7 +144,7 @@ def main():
 
             loss = (loss_x + loss_u) / 2.0
 
-            torch.distributed.barrier()
+            # torch.distributed.barrier()
 
             optimizer.zero_grad()
             loss.backward()
