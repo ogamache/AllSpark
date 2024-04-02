@@ -1,0 +1,11 @@
+2_Ortho_RGB/top_potsdam_7_11_RGB.tif 5_Labels_all/top_potsdam_7_11_label.tif
+2_Ortho_RGB/top_potsdam_6_12_RGB.tif 5_Labels_all/top_potsdam_6_12_label.tif
+2_Ortho_RGB/top_potsdam_5_13_RGB.tif 5_Labels_all/top_potsdam_5_13_label.tif
+2_Ortho_RGB/top_potsdam_7_7_RGB.tif 5_Labels_all/top_potsdam_7_7_label.tif
+2_Ortho_RGB/top_potsdam_6_10_RGB.tif 5_Labels_all/top_potsdam_6_10_label.tif
+2_Ortho_RGB/top_potsdam_5_10_RGB.tif 5_Labels_all/top_potsdam_5_10_label.tif
+2_Ortho_RGB/top_potsdam_2_14_RGB.tif 5_Labels_all/top_potsdam_2_14_label.tif
+2_Ortho_RGB/top_potsdam_6_8_RGB.tif 5_Labels_all/top_potsdam_6_8_label.tif
+2_Ortho_RGB/top_potsdam_2_11_RGB.tif 5_Labels_all/top_potsdam_2_11_label.tif
+2_Ortho_RGB/top_potsdam_3_14_RGB.tif 5_Labels_all/top_potsdam_3_14_label.tif
+2_Ortho_RGB/top_potsdam_4_11_RGB.tif 5_Labels_all/top_potsdam_4_11_label.tif

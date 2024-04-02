@@ -2,7 +2,7 @@
 now=$(date +"%Y%m%d_%H%M%S")
 
 # modify these augments if you want to try other datasets, splits or methods
-# dataset: ['pascal', 'cityscapes', 'coco']
+# dataset: ['pascal', 'cityscapes', 'coco', 'potsdam']
 # method: ['baseline_sup', 'baseline_semi', 'allspark']
 # split:
 ## 1. for 'pascal' select:
@@ -11,11 +11,12 @@ now=$(date +"%Y%m%d_%H%M%S")
 ###  - augmented (U2PL splits) ['u2pl_1_16', 'u2pl_1_8', 'u2pl_1_4', 'u2pl_1_2']
 ## 2. for 'cityscapes' select: ['1_16', '1_4', '1_8', '1_2']
 ## 3. for 'coco' select: ['1_512', '1_256', '1_128', '1_32']
+## 4. for 'potsdam' select: ['standard']
 
 
-dataset='pascal'
+dataset='potsdam'
 method='allspark'
-split='1_16'
+split='standard'
 
 
 config=configs/${dataset}_${method}.yaml
