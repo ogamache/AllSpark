@@ -16,7 +16,7 @@ now=$(date +"%Y%m%d_%H%M%S")
 
 dataset='potsdam'
 method='allspark'
-split='standard'
+split='1_2'
 
 
 config=configs/${dataset}_${method}.yaml

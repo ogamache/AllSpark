@@ -16,6 +16,7 @@ from util.ohem import ProbOhemCrossEntropy2d
 from util.utils import count_params, init_log, AverageMeter
 from util.dist_helper import setup_distributed
 from model.model_helper import ModelBuilder
+import numpy as np
 
 parser = argparse.ArgumentParser(description='Revisiting Weak-to-Strong Consistency in Semi-Supervised Semantic Segmentation')
 parser.add_argument('--config', type=str, required=True)
@@ -125,6 +126,11 @@ def main():
 
             img_x, mask_x = img_x.cuda(), mask_x.cuda()
             img_u_s = img_u_s.cuda()
+            print("#####################")
+            print(f"MAX: {torch.max(mask_x)}")
+            print(f"MIN: {torch.min(mask_x)}")
+            print(f"Mask shape: {mask_x.shape}\n")
+
 
             with torch.no_grad():
                 model.eval()
@@ -138,12 +144,13 @@ def main():
             num_lb, num_ulb = img_x.shape[0], img_u_s.shape[0]
             preds = model(torch.cat((img_x, img_u_s)))
             pred_x, pred_u = preds.split([num_lb, num_ulb])
+            print(f"Prediction shape: {pred_x.shape}\n")
 
             loss_x = criterion_l(pred_x, mask_x)
             loss_u = criterion_u(pred_u, pseudo_label)
 
             loss = (loss_x + loss_u) / 2.0
-
+            # print(f"Loss: {loss}")
             # torch.distributed.barrier()
 
             optimizer.zero_grad()
