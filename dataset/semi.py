@@ -12,7 +12,6 @@ import albumentations as A
 import albumentations.augmentations.functional as F
 from albumentations.pytorch import ToTensorV2
 
-
 class SemiDataset(Dataset):
     def __init__(self, name, root, mode, size=None, id_path=None, nsample=None):
         self.name = name
