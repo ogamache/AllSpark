@@ -29,7 +29,7 @@ parser.add_argument('--local_rank', default=0, type=int)
 parser.add_argument('--port', default=None, type=int)
 
 
-def evaluate(model, loader, mode, cfg):
+def evaluate(model, loader, mode, cfg, loss_function):
     model.eval()
     assert mode in ['original', 'center_crop', 'sliding_window']
     intersection_meter = AverageMeter()
@@ -40,10 +40,14 @@ def evaluate(model, loader, mode, cfg):
             
             img = img.cuda()
 
+            # OG: Simple val loss
+            prediction = model(img)
+            loss_val = loss_function(prediction, mask)
+
             if mode == 'sliding_window':
                 grid = cfg['crop_size']
                 b, _, h, w = img.shape
-                final = torch.zeros(b, 19, h, w).cuda()
+                final = torch.zeros(b, 6, h, w).cuda() # 19 (cityscape numb. classes) was hard-coded here instead of 6 for Potsdam
                 row = 0
                 while row < h:
                     col = 0
@@ -71,9 +75,9 @@ def evaluate(model, loader, mode, cfg):
             reduced_union = torch.from_numpy(union).cuda()
             reduced_target = torch.from_numpy(target).cuda()
 
-            dist.all_reduce(reduced_intersection)
-            dist.all_reduce(reduced_union)
-            dist.all_reduce(reduced_target)
+            # dist.all_reduce(reduced_intersection)
+            # dist.all_reduce(reduced_union)
+            # dist.all_reduce(reduced_target)
 
             intersection_meter.update(reduced_intersection.cpu().numpy())
             union_meter.update(reduced_union.cpu().numpy())
@@ -81,7 +85,7 @@ def evaluate(model, loader, mode, cfg):
     iou_class = intersection_meter.sum / (union_meter.sum + 1e-10) * 100.0
     mIOU = np.mean(iou_class)
 
-    return mIOU, iou_class
+    return mIOU, iou_class, loss_val
 
 
 def main():
