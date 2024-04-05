@@ -9,10 +9,17 @@ epochs: 200
 batch_size: 2 # per GPU x 4 GPUs
 lr: 0.001
 lr_multi: 10.0
+
 criterion:
   name: CELoss
   kwargs:
     ignore_index: 255
+# criterion:
+#   name: OHEM
+#   kwargs:
+#     ignore_index: 255
+#     thresh: 0.7
+#     min_kept: 200000
 
 criterion_u:
   name: CELoss
