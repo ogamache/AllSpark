@@ -42,10 +42,11 @@ def main():
     if rank == 0:
         all_args = {**cfg, **vars(args), 'ngpus': world_size}
         logger.info('{}\n'.format(pprint.pformat(all_args)))
+        
+        save_path = args.save_path
+        os.makedirs(save_path, exist_ok=True)
+        writer = SummaryWriter(save_path)
 
-        writer = SummaryWriter(args.save_path)
-
-        os.makedirs(args.save_path, exist_ok=True)
 
     cudnn.enabled = True
     cudnn.benchmark = True
@@ -95,8 +96,8 @@ def main():
     best_epoch = 0
     epoch = -1
 
-    if os.path.exists(os.path.join(args.save_path, 'latest.pth')):
-        checkpoint = torch.load(os.path.join(args.save_path, 'latest.pth'))
+    if os.path.exists(os.path.join(save_path, 'latest.pth')):
+        checkpoint = torch.load(os.path.join(save_path, 'latest.pth'))
         model.load_state_dict(checkpoint['model'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         epoch = checkpoint['epoch']
@@ -202,9 +203,9 @@ def main():
                 'best_epoch': best_epoch,
                 'previous_best': previous_best,
             }
-            torch.save(checkpoint, os.path.join(args.save_path, 'latest.pth'))
+            torch.save(checkpoint, os.path.join(save_path, 'latest.pth'))
             if is_best:
-                torch.save(checkpoint, os.path.join(args.save_path, 'best.pth'))
+                torch.save(checkpoint, os.path.join(save_path, 'best.pth'))
 
 
 if __name__ == '__main__':

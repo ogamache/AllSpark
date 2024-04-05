@@ -8,6 +8,10 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 
+import albumentations as A
+import albumentations.augmentations.functional as F
+from albumentations.pytorch import ToTensorV2
+
 
 class SemiDataset(Dataset):
     def __init__(self, name, root, mode, size=None, id_path=None, nsample=None):
@@ -15,6 +19,17 @@ class SemiDataset(Dataset):
         self.root = root
         self.mode = mode
         self.size = size
+        self.probability_transform = 0.2
+        self.transform = A.Compose(
+            [
+                A.ShiftScaleRotate(shift_limit=0.2, scale_limit=0.2, rotate_limit=30, p=self.probability_transform),
+                A.HorizontalFlip(p=self.probability_transform),
+                A.VerticalFlip(p=self.probability_transform),
+                A.RandomBrightnessContrast(p=self.probability_transform),
+                A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+                ToTensorV2(),
+            ]
+        )
 
         if mode == 'train_l' or mode == 'train_u':
             with open(id_path, 'r') as f:
@@ -43,14 +58,29 @@ class SemiDataset(Dataset):
         if self.mode == 'train_u':
             return normalize(img)
 
-        img_s1 = deepcopy(img)
+        img_tf = deepcopy(img)
+        mask_tf = deepcopy(mask)
 
-        if random.random() < 0.8:
-            img_s1 = transforms.ColorJitter(0.5, 0.5, 0.5, 0.25)(img_s1)
-        img_s1 = transforms.RandomGrayscale(p=0.2)(img_s1)
-        img_s1 = blur(img_s1, p=0.5)
-        img_s1, mask = normalize(img_s1, mask)
-        return img_s1, mask
+        # if random.random() < 0.8:
+        #     img_tf = transforms.ColorJitter(0.5, 0.5, 0.5, 0.25)(img_tf)
+        # img_tf = transforms.RandomGrayscale(p=0.2)(img_tf)
+        # img_tf = blur(img_tf, p=0.5)
+        # img_tf, mask = normalize(img_tf, mask_tf)
+
+        transformed = self.transform(image=np.array(img_tf), mask=np.array(mask_tf))
+        img_tf = transformed["image"].long()
+        mask_tf = transformed["mask"].long()
+
+        # # Visualize augmentation
+        # tensor_to_pil = transforms.ToPILImage()
+        # save_img_tf = tensor_to_pil(img_tf)
+        # save_mask_tf = tensor_to_pil(mask_tf)
+        # img.save("img_og.png")
+        # mask.save("mask_og.png")
+        # save_img_tf.save("img_tf.png")
+        # save_mask_tf.save("mask_tf.png")
+
+        return img_tf, mask_tf
 
     def __len__(self):
         return len(self.ids)
