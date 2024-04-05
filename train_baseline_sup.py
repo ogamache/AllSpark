@@ -41,6 +41,7 @@ def evaluate(model, loader, mode, cfg, loss_function):
             img = img.cuda()
 
             # OG: Simple val loss
+            mask = mask.cuda()
             prediction = model(img)
             loss_val = loss_function(prediction, mask)
 
@@ -69,7 +70,7 @@ def evaluate(model, loader, mode, cfg, loss_function):
                 pred = model(img).argmax(dim=1)
 
             intersection, union, target = \
-                intersectionAndUnion(pred.cpu().numpy(), mask.numpy(), cfg['nclass'], 255)
+                intersectionAndUnion(pred.cpu().numpy(), mask.cpu().numpy(), cfg['nclass'], 255)
 
             reduced_intersection = torch.from_numpy(intersection).cuda()
             reduced_union = torch.from_numpy(union).cuda()
