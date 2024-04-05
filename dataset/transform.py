@@ -11,21 +11,32 @@ def crop(img, mask, size, ignore_value=255):
     padw = size - w if w < size else 0
     padh = size - h if h < size else 0
     img = ImageOps.expand(img, border=(0, 0, padw, padh), fill=0)
-    mask = ImageOps.expand(mask, border=(0, 0, padw, padh), fill=ignore_value)
+    if isinstance(mask, list):
+        for id, m in enumerate(mask):
+            mask[id] = ImageOps.expand(m, border=(0, 0, padw, padh), fill=ignore_value)
+    else:
+        mask = ImageOps.expand(mask, border=(0, 0, padw, padh), fill=ignore_value)
 
     w, h = img.size
     x = random.randint(0, w - size)
     y = random.randint(0, h - size)
     img = img.crop((x, y, x + size, y + size))
-    mask = mask.crop((x, y, x + size, y + size))
-
+    if isinstance(mask, list):
+        for id, m in enumerate(mask):
+            mask[id] = m.crop((x, y, x + size, y + size))
+    else:
+        mask = mask.crop((x, y, x + size, y + size))
     return img, mask
 
 
 def hflip(img, mask, p=0.5):
     if random.random() < p:
         img = img.transpose(Image.FLIP_LEFT_RIGHT)
-        mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
+        if isinstance(mask, list):
+            for id, m in enumerate(mask):
+                mask[id] = m.transpose(Image.FLIP_LEFT_RIGHT)
+        else:
+            mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
     return img, mask
 
 
@@ -52,7 +63,11 @@ def resize(img, mask, ratio_range):
         oh = int(1.0 * h * long_side / w + 0.5)
 
     img = img.resize((ow, oh), Image.BILINEAR)
-    mask = mask.resize((ow, oh), Image.NEAREST)
+    if isinstance(mask, list):
+        for id, m in enumerate(mask):
+            mask[id] = m.resize((ow, oh), Image.NEAREST)
+    else:
+        mask = mask.resize((ow, oh), Image.NEAREST)
     return img, mask
 
 
