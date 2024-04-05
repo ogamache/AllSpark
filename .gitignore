@@ -3,6 +3,6 @@ exp/
 cityscapes/
 VOC2012/
 coco/
-Potsdam/
+potsdam/
 
 __pycache__/

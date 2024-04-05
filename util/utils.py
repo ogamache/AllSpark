@@ -2,6 +2,9 @@ import numpy as np
 import logging
 import os
 
+def verify_if_folder_exist_or_create_it(path):
+        if not os.path.isdir(path):
+            os.makedirs(path)
 
 def count_params(model):
     param_num = sum(p.numel() for p in model.parameters())

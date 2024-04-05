@@ -16,6 +16,7 @@ from util.ohem import ProbOhemCrossEntropy2d
 from util.utils import count_params, init_log, AverageMeter
 from util.dist_helper import setup_distributed
 from model.model_helper import ModelBuilder
+import numpy as np
 
 parser = argparse.ArgumentParser(description='Revisiting Weak-to-Strong Consistency in Semi-Supervised Semantic Segmentation')
 parser.add_argument('--config', type=str, required=True)
@@ -125,6 +126,11 @@ def main():
 
             img_x, mask_x = img_x.cuda(), mask_x.cuda()
             img_u_s = img_u_s.cuda()
+            # print("#####################")
+            # print(f"MAX: {torch.max(mask_x)}")
+            # print(f"MIN: {torch.min(mask_x)}")
+            # print(f"Mask shape: {mask_x.shape}\n")
+
 
             with torch.no_grad():
                 model.eval()
@@ -138,12 +144,13 @@ def main():
             num_lb, num_ulb = img_x.shape[0], img_u_s.shape[0]
             preds = model(torch.cat((img_x, img_u_s)))
             pred_x, pred_u = preds.split([num_lb, num_ulb])
+            # print(f"Prediction shape: {pred_x.shape}\n")
 
             loss_x = criterion_l(pred_x, mask_x)
             loss_u = criterion_u(pred_u, pseudo_label)
 
             loss = (loss_x + loss_u) / 2.0
-
+            # print(f"Loss: {loss}")
             # torch.distributed.barrier()
 
             optimizer.zero_grad()
@@ -167,11 +174,13 @@ def main():
             if (i % (len(trainloader_u) // 8) == 0) and (rank == 0):
                 logger.info('Iters: {:}, Total loss: {:.3f}, Loss x: {:.3f}, Loss u: {:.3f}'
                             .format(i, total_loss.avg, total_loss_x.avg, total_loss_u.avg))
-        model.module.decoder.set_SMem_status(epoch=epoch, isVal=True)
-        eval_mode = 'sliding_window' if cfg['dataset'] == 'cityscapes' else 'original'
-        mIoU, iou_class = evaluate(model, valloader, eval_mode, cfg)
+        model.decoder.set_SMem_status(epoch=epoch, isVal=True)
+        eval_mode = 'sliding_window' if (cfg['dataset'] == 'cityscapes' or cfg['dataset'] == 'potsdam') else 'original'
+        mIoU, iou_class, loss_val = evaluate(model, valloader, eval_mode, cfg, criterion_l)
 
         if rank == 0:
+            writer.add_scalar('train/loss_val', loss_val.item(), epoch)
+            logger.info(f"Validation loss: {loss_val.item()}")
             for (cls_idx, iou) in enumerate(iou_class):
                 logger.info('***** Evaluation ***** >>>> Class [{:} {:}] '
                             'IoU: {:.2f}'.format(cls_idx, CLASSES[cfg['dataset']][cls_idx], iou))
