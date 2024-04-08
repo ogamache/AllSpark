@@ -7,7 +7,7 @@ from utils import verify_if_folder_exist_or_create_it
 dataset = "potsdam"
 split_name = "1_2_patch"
 path_images = "2_Ortho_RGB_patches/"
-path_gts  = "5_Labels_all_patches/"
+path_gts = "5_Labels_all_patches/"
 train_percentage = 0.8
 
 verify_if_folder_exist_or_create_it(f"./splits/{dataset}/{split_name}/")

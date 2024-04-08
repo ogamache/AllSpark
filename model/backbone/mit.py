@@ -363,7 +363,7 @@ model_urls = {
     "mit_b2": "./pretrained_weights/mit_b2.pth",
     "mit_b3": "./pretrained_weights/mit_b3.pth",
     "mit_b4": "./pretrained_weights/mit_b4.pth",
-    "mit_b5": "./pretrained_weights/mit_b5.pth",
+    "mit_b5": "pretrained_weights/mit_b5.pth",
 }
 
 
