@@ -18,13 +18,16 @@ class SemiDataset(Dataset):
         self.root = root
         self.mode = mode
         self.size = size
-        self.probability_transform = 0.2
+        self.probability_transform = 0.5
         self.transform = A.Compose(
             [
-                A.ShiftScaleRotate(shift_limit=0.2, scale_limit=0.2, rotate_limit=30, p=self.probability_transform),
-                A.HorizontalFlip(p=self.probability_transform),
-                A.VerticalFlip(p=self.probability_transform),
-                A.RandomBrightnessContrast(p=self.probability_transform),
+                # A.ShiftScaleRotate(shift_limit=0.2, scale_limit=0.2, rotate_limit=30, p=self.probability_transform),
+                # A.HorizontalFlip(p=self.probability_transform),
+                # A.VerticalFlip(p=self.probability_transform),
+                # A.RandomBrightnessContrast(p=self.probability_transform),
+                A.ColorJitter(0.5, 0.5, 0.5, 0.25, p=self.probability_transform),
+                A.ToGray(p=0.2),
+                A.Blur(p=self.probability_transform),
                 A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
                 ToTensorV2(),
             ]
