@@ -17,8 +17,6 @@ from util.ohem import ProbOhemCrossEntropy2d
 from util.utils import count_params, init_log, AverageMeter
 from util.dist_helper import setup_distributed
 from model.model_helper import ModelBuilder
-import cv2
-import numpy as np
 
 parser = argparse.ArgumentParser(description='Revisiting Weak-to-Strong Consistency in Semi-Supervised Semantic Segmentation')
 parser.add_argument('--config', type=str, required=True)
@@ -30,7 +28,7 @@ parser.add_argument('--local_rank', default=0, type=int)
 
 def entropy_loss(pred, batch_size, entropy_bool):
     if not entropy_bool:
-        return 0
+        return torch.tensor(0)
 
     prob_x = torch.softmax(pred, dim=1)
     entropy_unlabeled_map = torch.sum(-prob_x * torch.log(prob_x + 1e-8), dim=1)
@@ -44,7 +42,7 @@ def entropy_loss(pred, batch_size, entropy_bool):
 
 def mask_reconstruction_loss(mask_reconstruction_bool):
     if not mask_reconstruction_bool:
-        return 0
+        return torch.tensor(0)
     loss_mask_reconstruction = 0
     return loss_mask_reconstruction
 
@@ -201,7 +199,7 @@ def main():
                 writer.add_scalar('train/loss_x', loss_x.item(), iters)
                 writer.add_scalar('train/loss_u', loss_u.item(), iters)
                 writer.add_scalar('train/loss_entropy', loss_entropy.item(), iters)
-                writer.add_scalar('train/loss_mask', loss_mask, iters)
+                writer.add_scalar('train/loss_mask', loss_mask.item(), iters)
 
             if (i % (len(trainloader_u) // 8) == 0) and (rank == 0):
                 logger.info('Iters: {:}, Total loss: {:.3f}, Loss x: {:.3f}, Loss u: {:.3f}'

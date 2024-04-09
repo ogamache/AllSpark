@@ -13,7 +13,7 @@ lr_multi: 10.0
 multi-tasks:
   entropy:
     bool: True
-    loss_factor: 0.2
+    loss_factor: 0.02
   mask:
     bool: False
     loss_factor: 0.1
