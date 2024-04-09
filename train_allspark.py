@@ -10,12 +10,14 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import yaml
 from dataset.semi import SemiDataset
+from dataset.semi_weak import SemiDatasetWeak
 from train_baseline_sup import evaluate
 from util.classes import CLASSES
 from util.ohem import ProbOhemCrossEntropy2d
 from util.utils import count_params, init_log, AverageMeter
 from util.dist_helper import setup_distributed
 from model.model_helper import ModelBuilder
+import cv2
 import numpy as np
 
 parser = argparse.ArgumentParser(description='Revisiting Weak-to-Strong Consistency in Semi-Supervised Semantic Segmentation')
@@ -26,6 +28,25 @@ parser.add_argument('--save-path', type=str, required=True)
 parser.add_argument('--local_rank', default=0, type=int)
 # parser.add_argument('--port', default=None, type=int, required=False)
 
+def entropy_loss(pred, batch_size, entropy_bool):
+    if not entropy_bool:
+        return 0
+
+    prob_x = torch.softmax(pred, dim=1)
+    entropy_unlabeled_map = torch.sum(-prob_x * torch.log(prob_x + 1e-8), dim=1)
+    sum_entropy_per_batch = torch.sum(entropy_unlabeled_map, dim=(1, 2))
+    total_entropy_sum = torch.sum(sum_entropy_per_batch)
+
+    total_pixels = entropy_unlabeled_map.size(1) * entropy_unlabeled_map.size(2)
+
+    loss_entropy = total_entropy_sum * (1/total_pixels) * (1/batch_size)
+    return loss_entropy
+
+def mask_reconstruction_loss(mask_reconstruction_bool):
+    if not mask_reconstruction_bool:
+        return 0
+    loss_mask_reconstruction = 0
+    return loss_mask_reconstruction
 
 def main():
     args = parser.parse_args()
@@ -79,13 +100,21 @@ def main():
                              cfg['crop_size'], args.unlabeled_id_path)
     trainset_l = SemiDataset(cfg['dataset'], cfg['data_root'], 'train_l',
                              cfg['crop_size'], args.labeled_id_path, nsample=len(trainset_u.ids))
+    trainset_u_weak = SemiDatasetWeak(cfg['dataset'], cfg['data_root'], 'train_u',
+                            cfg['crop_size'], args.unlabeled_id_path)
+    trainset_l_weak = SemiDatasetWeak(cfg['dataset'], cfg['data_root'], 'train_l',
+                            cfg['crop_size'], args.labeled_id_path, nsample=len(trainset_u_weak.ids))
     valset = SemiDataset(cfg['dataset'], cfg['data_root'], 'val')
 
     # trainsampler_l = torch.utils.data.distributed.DistributedSampler(trainset_l)
     trainloader_l = DataLoader(trainset_l, batch_size=cfg['batch_size'],
                                pin_memory=True, num_workers=1, drop_last=True)
+    trainloader_l_weak = DataLoader(trainset_l_weak, batch_size=cfg['batch_size'],
+                               pin_memory=True, num_workers=1, drop_last=True)
     # trainsampler_u = torch.utils.data.distributed.DistributedSampler(trainset_u)
     trainloader_u = DataLoader(trainset_u, batch_size=cfg['batch_size'],
+                               pin_memory=True, num_workers=1, drop_last=True)
+    trainloader_u_weak = DataLoader(trainset_u_weak, batch_size=cfg['batch_size'],
                                pin_memory=True, num_workers=1, drop_last=True)
     # valsampler = torch.utils.data.distributed.DistributedSampler(valset)
     valloader = DataLoader(valset, batch_size=1, pin_memory=True, num_workers=1,
@@ -119,18 +148,17 @@ def main():
         # trainloader_l.sampler.set_epoch(epoch)
         # trainloader_u.sampler.set_epoch(epoch)
 
-        loader = zip(trainloader_l, trainloader_u)
+        loader = zip(trainloader_l, trainloader_u, trainloader_l_weak, trainloader_u_weak)
 
         model.decoder.set_SMem_status(epoch=epoch, isVal=False)
 
-        for i, ((img_x, mask_x), img_u_s) in enumerate(loader):
+        for i, ((img_x, mask_x), img_u_s, (img_x_weak, mask_x_weak), img_u_s_weak) in enumerate(loader):
 
             img_x, mask_x = img_x.cuda(), mask_x.cuda()
             img_u_s = img_u_s.cuda()
-            # print("#####################")
-            # print(f"MAX: {torch.max(mask_x)}")
-            # print(f"MIN: {torch.min(mask_x)}")
-            # print(f"Mask shape: {mask_x.shape}\n")
+            if cfg["multi-tasks"]["mask"]:
+                img_x_weak, mask_x_weak = img_x_weak.cuda(), mask_x_weak.cuda()
+                img_u_s_weak = img_u_s_weak.cuda()
 
 
             with torch.no_grad():
@@ -147,22 +175,11 @@ def main():
             pred_x, pred_u = preds.split([num_lb, num_ulb])
             # print(f"Prediction shape: {pred_x.shape}\n")
 
-            if cfg["entropy"] == True:
-                prob_x = torch.softmax(pred_x, dim=1)
-                entropy_unlabeled_map = torch.sum(-prob_x * torch.log(prob_x + 1e-8), dim=1)
-                sum_entropy_per_batch = torch.sum(entropy_unlabeled_map, dim=(1, 2))
-                total_entropy_sum = torch.sum(sum_entropy_per_batch)
-
-                total_pixels = entropy_unlabeled_map.size(1) * entropy_unlabeled_map.size(2)
-                batch_size = img_x.size(0)
-
-                term_entropy = total_entropy_sum * (1/total_pixels) * (1/batch_size)
+            loss_entropy = entropy_loss(pred_u, cfg["batch_size"], cfg["multi-tasks"]["entropy"]["bool"])
+            loss_mask = mask_reconstruction_loss(cfg["multi-tasks"]["mask"]["bool"])
                 
-                loss_x = criterion_l(pred_x, mask_x)
-                loss_u = criterion_u(pred_u, pseudo_label) + 0.2 * term_entropy
-            else:
-                loss_x = criterion_l(pred_x, mask_x)
-                loss_u = criterion_u(pred_u, pseudo_label)
+            loss_x = criterion_l(pred_x, mask_x)
+            loss_u = criterion_u(pred_u, pseudo_label) + cfg["multi-tasks"]["entropy"]["loss_factor"] * loss_entropy + cfg["multi-tasks"]["mask"]["loss_factor"] * loss_mask
             
             loss = (loss_x + loss_u) / 2.0
 
@@ -183,6 +200,8 @@ def main():
                 writer.add_scalar('train/loss_all', loss.item(), iters)
                 writer.add_scalar('train/loss_x', loss_x.item(), iters)
                 writer.add_scalar('train/loss_u', loss_u.item(), iters)
+                writer.add_scalar('train/loss_entropy', loss_entropy.item(), iters)
+                writer.add_scalar('train/loss_mask', loss_mask, iters)
 
             if (i % (len(trainloader_u) // 8) == 0) and (rank == 0):
                 logger.info('Iters: {:}, Total loss: {:.3f}, Loss x: {:.3f}, Loss u: {:.3f}'
