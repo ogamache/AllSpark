@@ -124,6 +124,7 @@ def main():
 
         for i, ((img_x, mask_x), img_u_s) in enumerate(loader):
 
+
             img_x, mask_x = img_x.cuda(), mask_x.cuda()
             img_u_s = img_u_s.cuda()
             # print("#####################")
@@ -145,7 +146,7 @@ def main():
             preds = model(torch.cat((img_x, img_u_s)))
             pred_x, pred_u = preds.split([num_lb, num_ulb])
 
-
+            ##################################################################################################
             #### pred_u shape: [batch_size, num_classes, height, width]
             prob_x = torch.softmax(pred_x, dim=1)
             entropy_unlabeled_map = torch.sum(-prob_x * torch.log(prob_x + 1e-8), dim=1)
@@ -156,6 +157,7 @@ def main():
             batch_size = img_x.size(0)
 
             term_entropy = total_entropy_sum * (1/total_pixels) * (1/batch_size)
+            #################################################################################################
 
 
             loss_x = criterion_l(pred_x, mask_x)
