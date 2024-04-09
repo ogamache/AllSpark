@@ -147,12 +147,24 @@ def main():
             pred_x, pred_u = preds.split([num_lb, num_ulb])
             # print(f"Prediction shape: {pred_x.shape}\n")
 
-            loss_x = criterion_l(pred_x, mask_x)
-            loss_u = criterion_u(pred_u, pseudo_label)
+            if cfg["entropy"] == True:
+                prob_x = torch.softmax(pred_x, dim=1)
+                entropy_unlabeled_map = torch.sum(-prob_x * torch.log(prob_x + 1e-8), dim=1)
+                sum_entropy_per_batch = torch.sum(entropy_unlabeled_map, dim=(1, 2))
+                total_entropy_sum = torch.sum(sum_entropy_per_batch)
 
+                total_pixels = entropy_unlabeled_map.size(1) * entropy_unlabeled_map.size(2)
+                batch_size = img_x.size(0)
+
+                term_entropy = total_entropy_sum * (1/total_pixels) * (1/batch_size)
+                
+                loss_x = criterion_l(pred_x, mask_x)
+                loss_u = criterion_u(pred_u, pseudo_label) + 0.2 * term_entropy
+            else:
+                loss_x = criterion_l(pred_x, mask_x)
+                loss_u = criterion_u(pred_u, pseudo_label)
+            
             loss = (loss_x + loss_u) / 2.0
-            # print(f"Loss: {loss}")
-            # torch.distributed.barrier()
 
             optimizer.zero_grad()
             loss.backward()

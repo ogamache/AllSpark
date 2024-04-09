@@ -10,6 +10,8 @@ batch_size: 2 # per GPU x 4 GPUs
 lr: 0.001
 lr_multi: 10.0
 
+entropy: True
+
 criterion:
   name: CELoss
   kwargs:
