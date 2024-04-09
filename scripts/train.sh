@@ -17,12 +17,13 @@ now=$(date +"%Y%m%d_%H%M%S")
 dataset='potsdam'
 method='allspark'
 split='1_2_patch'
+version='0'
 
 
 config=configs/${dataset}_${method}.yaml
 labeled_id_path=splits/$dataset/$split/labeled.txt
 unlabeled_id_path=splits/$dataset/$split/unlabeled.txt
-save_path=exp/$dataset/$method/$split
+save_path=exp/$dataset/$method/$split"_v"$version
 
 mkdir -p $save_path
 
