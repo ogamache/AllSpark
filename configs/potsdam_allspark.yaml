@@ -5,7 +5,7 @@ crop_size: 513
 data_root: ./potsdam
 
 # arguments for training
-epochs: 150
+epochs: 200
 batch_size: 2 # per GPU x 4 GPUs
 lr: 0.001
 lr_multi: 10.0
