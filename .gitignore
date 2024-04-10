@@ -4,5 +4,6 @@ cityscapes/
 VOC2012/
 coco/
 .venv/
+custom_dataset/
 
 __pycache__/
