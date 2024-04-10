@@ -44,7 +44,7 @@ class SemiDataset(Dataset):
                 self.ids = f.read().splitlines()
 
     def __getitem__(self, item):
-        if self.name == "potsdam":
+        if self.name != "CVPR":
             id = self.ids[item]
             img = Image.open(os.path.join(self.root, id.split(' ')[0])).convert('RGB')
             mask = Image.fromarray(np.array(Image.open(os.path.join(self.root, id.split(' ')[1]))))
@@ -78,9 +78,12 @@ class SemiDataset(Dataset):
         else:
             logger = init_log('semi')
             logger.propagate = 0
+
             id = self.ids[item]
+            n_classes = len(id.split(' '))
+
             img = Image.open(os.path.join(self.root, id.split(' ')[0])).convert('RGB')
-            masks = self.__fetch_all_masks(self.root, id.split(' ')[1])
+            masks = self.__fetch_all_masks(n_classes, self.root, id.split(' '))
 
             if self.mode == 'val':
                 img = normalize(img)
@@ -106,6 +109,8 @@ class SemiDataset(Dataset):
             transformed = self.transform(image=np.array(img_tf), masks=mask_tf)
             img_tf = transformed["image"].long()
             mask_tf = transformed["masks"]
+
+            mask_tf = self.__combined_all_masks(mask_tf)
             logger.info(f"{mask_tf[0]}")
 
             ## function to merge all the masks into one deep image
@@ -125,11 +130,12 @@ class SemiDataset(Dataset):
     def __len__(self):
         return len(self.ids)
     
-    def __fetch_all_masks(self, path):
-        mask1 = Image.fromarray(np.array(Image.open(os.path.join(path))))
-        mask2 = Image.fromarray(np.array(Image.open(os.path.join(path))))
-        mask3 = Image.fromarray(np.array(Image.open(os.path.join(path))))
-        return [mask1, mask2, mask3]
+    def __fetch_all_masks(self, n_classes, path):
+        mask_list = []
+        for i in range(n_classes):
+            mask_list.append(Image.open(path[i+1]))
+        return mask_list
     
     def __combined_all_masks(self, masks):
-        return
+        masks = torch.from_numpy(np.stack(masks)).long()
+        return masks

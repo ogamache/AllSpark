@@ -74,6 +74,10 @@ def main():
         raise NotImplementedError('%s criterion is not implemented' % cfg['criterion']['name'])
 
     criterion_u = nn.CrossEntropyLoss(**cfg['criterion_u']['kwargs']).cuda(local_rank)
+
+    if cfg["dataset"] == "CVPR":
+        criterion_l = nn.BCEWithLogitsLoss(**cfg['criterion']['kwargs']).cuda(local_rank)
+        criterion_u = nn.BCEWithLogitsLoss(**cfg['criterion_u']['kwargs']).cuda(local_rank)
     
     trainset_u = SemiDataset(cfg['dataset'], cfg['data_root'], 'train_u',
                              cfg['crop_size'], args.unlabeled_id_path)
