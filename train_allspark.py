@@ -2,6 +2,8 @@ import argparse
 import logging
 import os
 import pprint
+
+import numpy as np
 import torch
 from torch import nn
 import torch.backends.cudnn as cudnn
@@ -17,6 +19,7 @@ from util.ohem import ProbOhemCrossEntropy2d
 from util.utils import count_params, init_log, AverageMeter
 from util.dist_helper import setup_distributed
 from model.model_helper import ModelBuilder
+import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description='Revisiting Weak-to-Strong Consistency in Semi-Supervised Semantic Segmentation')
 parser.add_argument('--config', type=str, required=True)
@@ -40,10 +43,16 @@ def entropy_loss(pred, batch_size, entropy_bool):
     loss_entropy = total_entropy_sum * (1/total_pixels) * (1/batch_size)
     return loss_entropy
 
-def mask_reconstruction_loss(mask_reconstruction_bool):
+def mask_reconstruction_loss(true_label_weak_masked, pseudo_label_weak_masked, pred_x_masked, pred_u_masked, mask, mask_reconstruction_bool):
     if not mask_reconstruction_bool:
         return torch.tensor(0)
-    loss_mask_reconstruction = 0
+    true_label_weak_masked = true_label_weak_masked[mask == 0]
+    pseudo_label_weak_masked = pseudo_label_weak_masked[mask == 0]
+    pred_x_masked = pred_x_masked[mask == 0]
+    pred_u_masked = pred_u_masked[mask == 0]
+    y = torch.cat((true_label_weak_masked, pseudo_label_weak_masked))
+    y_hat = torch.cat((pred_x_masked, pred_u_masked))
+    loss_mask_reconstruction = nn.CrossEntropyLoss(y_hat, y)
     return loss_mask_reconstruction
 
 def main():
@@ -78,7 +87,7 @@ def main():
     if rank == 0:
         logger.info('Total params: {:.1f}M\n'.format(count_params(model)))
 
-    local_rank = int(os.environ["LOCAL_RANK"])
+    local_rank = 0
     model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model) #OG
     model.cuda()
 
@@ -154,10 +163,6 @@ def main():
 
             img_x, mask_x = img_x.cuda(), mask_x.cuda()
             img_u_s = img_u_s.cuda()
-            if cfg["multi-tasks"]["mask"]:
-                img_x_weak, mask_x_weak = img_x_weak.cuda(), mask_x_weak.cuda()
-                img_u_s_weak = img_u_s_weak.cuda()
-
 
             with torch.no_grad():
                 model.eval()
@@ -171,11 +176,25 @@ def main():
             num_lb, num_ulb = img_x.shape[0], img_u_s.shape[0]
             preds = model(torch.cat((img_x, img_u_s)))
             pred_x, pred_u = preds.split([num_lb, num_ulb])
-            # print(f"Prediction shape: {pred_x.shape}\n")
+
+            loss_mask = 0
+            if cfg["multi-tasks"]["mask"]:
+                img_x_weak, true_label_weak_masked = img_x_weak.cuda(), mask_x_weak.cuda()
+                img_u_s_weak = img_u_s_weak.cuda()
+                pseudo_label_weak_masked = model(img_u_s_weak)
+                shape = img_u_s_weak.shape
+                mask = torch.randint(0, 2, shape).cuda()
+                img_u_weak_masked = img_u_s_weak.cuda() * mask
+                img_x_weak_masked = img_x_weak.cuda() * mask
+                num_lb_masked, num_ulb_masked = img_x_weak_masked.shape[0], img_u_weak_masked.shape[0]
+                preds_masked = model(torch.cat((img_x_weak_masked, img_u_weak_masked)))
+                pred_x_masked, pred_u_masked = preds_masked.split([num_lb_masked, num_ulb_masked])
+                loss_mask = mask_reconstruction_loss(true_label_weak_masked, pseudo_label_weak_masked, pred_x_masked,
+                                                     pred_u_masked, mask, cfg["multi-tasks"]["mask"]["bool"])
+
 
             loss_entropy = entropy_loss(pred_u, cfg["batch_size"], cfg["multi-tasks"]["entropy"]["bool"])
-            loss_mask = mask_reconstruction_loss(cfg["multi-tasks"]["mask"]["bool"])
-                
+
             loss_x = criterion_l(pred_x, mask_x)
             loss_u = criterion_u(pred_u, pseudo_label) + cfg["multi-tasks"]["entropy"]["loss_factor"] * loss_entropy + cfg["multi-tasks"]["mask"]["loss_factor"] * loss_mask
             
