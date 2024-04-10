@@ -46,14 +46,74 @@ def entropy_loss(pred, batch_size, entropy_bool):
 def mask_reconstruction_loss(true_label_weak_masked, pseudo_label_weak_masked, pred_x_masked, pred_u_masked, mask, mask_reconstruction_bool):
     if not mask_reconstruction_bool:
         return torch.tensor(0)
-    true_label_weak_masked = true_label_weak_masked[mask == 0]
-    pseudo_label_weak_masked = pseudo_label_weak_masked[mask == 0]
-    pred_x_masked = pred_x_masked[mask == 0]
-    pred_u_masked = pred_u_masked[mask == 0]
-    y = torch.cat((true_label_weak_masked, pseudo_label_weak_masked))
-    y_hat = torch.cat((pred_x_masked, pred_u_masked))
-    loss_mask_reconstruction = nn.CrossEntropyLoss(y_hat, y)
-    return loss_mask_reconstruction
+    true_label_weak_masked_ = true_label_weak_masked.cpu() * (1 - mask.squeeze(dim=1))
+    pseudo_label_weak_masked_ = pseudo_label_weak_masked.cpu() * (1 - mask.squeeze(dim=1))
+    pred_x_masked_ = pred_x_masked.cpu() * (1 - mask)
+    pred_u_masked_ = pred_u_masked.cpu() * (1 - mask)
+
+
+    # plt.imshow(mask[0,0,:,:])
+    # plt.show()
+    #
+    # true_label_weak_masked_np = true_label_weak_masked[0].cpu().detach().numpy()
+    # pseudo_label_weak_masked_np = pseudo_label_weak_masked[0].cpu().detach().numpy()
+    # pred_x_masked_np = pred_x_masked[0, 0, :].cpu().detach().numpy()
+    # pred_u_masked_np = pred_u_masked[0, 0, :].cpu().detach().numpy()
+
+    # Plot side by side
+
+    # fig, axes = plt.subplots(2, 2)
+    #
+    # axes[0, 0].imshow(true_label_weak_masked_np, cmap='viridis')
+    # axes[0, 0].set_title('True Label Weak Masked')
+    #
+    # axes[0, 1].imshow(pseudo_label_weak_masked_np, cmap='viridis')
+    # axes[0, 1].set_title('Pseudo Label Weak Masked')
+    #
+    # axes[1, 0].imshow(pred_x_masked_np, cmap='viridis')
+    # axes[1, 0].set_title('Pred X Masked')
+    #
+    # axes[1, 1].imshow(pred_u_masked_np, cmap='viridis')
+    # axes[1, 1].set_title('Pred U Masked')
+    #
+    # # Hide the axes
+    # for ax in axes.flatten():
+    #     ax.axis('off')
+    #
+    # plt.show()
+    #
+    # true_label_weak_masked_np = true_label_weak_masked_[0].cpu().detach().numpy()
+    # pseudo_label_weak_masked_np = pseudo_label_weak_masked_[0].cpu().detach().numpy()
+    # pred_x_masked_np = pred_x_masked_[0, 0, :].cpu().detach().numpy()
+    # pred_u_masked_np = pred_u_masked_[0, 0, :].cpu().detach().numpy()
+    #
+    # # Plot side by side
+    #
+    # fig, axes = plt.subplots(2, 2)
+    #
+    # axes[0, 0].imshow(true_label_weak_masked_np, cmap='viridis')
+    # axes[0, 0].set_title('True Label Weak Masked')
+    #
+    # axes[0, 1].imshow(pseudo_label_weak_masked_np, cmap='viridis')
+    # axes[0, 1].set_title('Pseudo Label Weak Masked')
+    #
+    # axes[1, 0].imshow(pred_x_masked_np, cmap='viridis')
+    # axes[1, 0].set_title('Pred X Masked')
+    #
+    # axes[1, 1].imshow(pred_u_masked_np, cmap='viridis')
+    # axes[1, 1].set_title('Pred U Masked')
+    #
+    # # Hide the axes
+    # for ax in axes.flatten():
+    #     ax.axis('off')
+    #
+    # plt.show()
+    # exit()
+
+    loss = nn.CrossEntropyLoss(ignore_index=255).cuda()
+    loss_mask_reconstruction_l = loss(pred_x_masked_, true_label_weak_masked_)
+    loss_mask_reconstruction_u = loss(pred_u_masked_, pseudo_label_weak_masked_)
+    return (loss_mask_reconstruction_l + loss_mask_reconstruction_u) / 2
 
 def main():
     args = parser.parse_args()
@@ -173,25 +233,31 @@ def main():
 
 
             model.train()
+            loss_mask = 0
+            if cfg["multi-tasks"]["mask"]:
+                mask = torch.randint(0, 2, (img_u_s_weak.shape[0], 1, img_u_s_weak.shape[2], img_u_s_weak.shape[3]))
+                img_u_weak_masked = img_u_s_weak * mask
+                img_x_weak_masked = img_x_weak * mask
+                num_lb_masked, num_ulb_masked = img_x_weak_masked.shape[0], img_u_weak_masked.shape[0]
+
+                preds_masked = model(torch.cat((img_x_weak_masked, img_u_weak_masked)).cuda())
+                pred_x_masked, pred_u_masked = preds_masked.split([num_lb_masked, num_ulb_masked])
+
+                pseudo_label_weak_masked = model(img_u_s_weak.cuda()).detach()
+                model.decoder.set_pseudo_prob_map(pseudo_label_weak_masked)
+                pseudo_label_weak_masked = pseudo_label_weak_masked.argmax(dim=1)
+                model.decoder.set_pseudo_label(pseudo_label_weak_masked)
+
+                loss_mask = mask_reconstruction_loss(mask_x_weak, pseudo_label_weak_masked, pred_x_masked,
+                                                     pred_u_masked, mask, cfg["multi-tasks"]["mask"]["bool"])
+                del preds_masked
+                del pred_x_masked, pred_u_masked
+                del pseudo_label_weak_masked
+
+
             num_lb, num_ulb = img_x.shape[0], img_u_s.shape[0]
             preds = model(torch.cat((img_x, img_u_s)))
             pred_x, pred_u = preds.split([num_lb, num_ulb])
-
-            loss_mask = 0
-            if cfg["multi-tasks"]["mask"]:
-                img_x_weak, true_label_weak_masked = img_x_weak.cuda(), mask_x_weak.cuda()
-                img_u_s_weak = img_u_s_weak.cuda()
-                pseudo_label_weak_masked = model(img_u_s_weak)
-                shape = img_u_s_weak.shape
-                mask = torch.randint(0, 2, shape).cuda()
-                img_u_weak_masked = img_u_s_weak.cuda() * mask
-                img_x_weak_masked = img_x_weak.cuda() * mask
-                num_lb_masked, num_ulb_masked = img_x_weak_masked.shape[0], img_u_weak_masked.shape[0]
-                preds_masked = model(torch.cat((img_x_weak_masked, img_u_weak_masked)))
-                pred_x_masked, pred_u_masked = preds_masked.split([num_lb_masked, num_ulb_masked])
-                loss_mask = mask_reconstruction_loss(true_label_weak_masked, pseudo_label_weak_masked, pred_x_masked,
-                                                     pred_u_masked, mask, cfg["multi-tasks"]["mask"]["bool"])
-
 
             loss_entropy = entropy_loss(pred_u, cfg["batch_size"], cfg["multi-tasks"]["entropy"]["bool"])
 
