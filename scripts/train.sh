@@ -14,9 +14,9 @@ now=$(date +"%Y%m%d_%H%M%S")
 ## 4. for 'potsdam' select: ['standard']
 
 
-dataset='potsdam'
+dataset='CVPR'
 method='allspark'
-split='1_2_patch'
+split='1_2'
 version='2'
 
 
@@ -25,9 +25,7 @@ labeled_id_path=splits/$dataset/$split/labeled.txt
 unlabeled_id_path=splits/$dataset/$split/unlabeled.txt
 save_path=exp/$dataset/$method/$split"_v"$version
 
-mkdir -p $save_path
-
-# python3 -m torch.distributed.launch \
+mkdir -p $save_path\
 #     --nproc_per_node=$1 \
 #     --master_addr=localhost \
 #     --master_port=$2 \

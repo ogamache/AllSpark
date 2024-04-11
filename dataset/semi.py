@@ -80,10 +80,10 @@ class SemiDataset(Dataset):
             logger.propagate = 0
 
             id = self.ids[item]
-            n_classes = len(id.split(' '))
+            n_classes = len(id.split(' ')) - 2
 
-            img = Image.open(os.path.join(self.root, id.split(' ')[0])).convert('RGB')
-            masks = self.__fetch_all_masks(n_classes, self.root, id.split(' '))
+            masks = self.__fetch_all_masks(self.root, id, n_classes)
+            img = Image.open(os.path.join(self.root, id.split(" ")[0])).convert("RGB")
 
             if self.mode == 'val':
                 img = normalize(img)
@@ -130,10 +130,11 @@ class SemiDataset(Dataset):
     def __len__(self):
         return len(self.ids)
     
-    def __fetch_all_masks(self, n_classes, path):
+    def __fetch_all_masks(self, root, id_now, n_classes):
         mask_list = []
         for i in range(n_classes):
-            mask_list.append(Image.open(path[i+1]))
+            img = Image.open(os.path.join(root, id_now.split(" ")[i+1]))
+            mask_list.append(img)
         return mask_list
     
     def __combined_all_masks(self, masks):
