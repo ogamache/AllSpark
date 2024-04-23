@@ -20,6 +20,8 @@ from util.utils import count_params, init_log, AverageMeter
 from util.dist_helper import setup_distributed
 from model.model_helper import ModelBuilder
 import matplotlib.pyplot as plt
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 
 parser = argparse.ArgumentParser(description='Revisiting Weak-to-Strong Consistency in Semi-Supervised Semantic Segmentation')
 parser.add_argument('--config', type=str, required=True)
@@ -43,76 +45,29 @@ def entropy_loss(pred, batch_size, entropy_bool):
     loss_entropy = total_entropy_sum * (1/total_pixels) * (1/batch_size)
     return loss_entropy
 
-def mask_reconstruction_loss(true_label_weak_masked, pseudo_label_weak_masked, pred_x_masked, pred_u_masked, mask, mask_reconstruction_bool):
-    if not mask_reconstruction_bool:
-        return torch.tensor(0)
-    true_label_weak_masked_ = true_label_weak_masked.cpu() * (1 - mask.squeeze(dim=1))
-    pseudo_label_weak_masked_ = pseudo_label_weak_masked.cpu() * (1 - mask.squeeze(dim=1))
-    pred_x_masked_ = pred_x_masked.cpu() * (1 - mask)
-    pred_u_masked_ = pred_u_masked.cpu() * (1 - mask)
-
-
-    plt.imshow(mask[0,0,:,:])
-    plt.show()
-
-    true_label_weak_masked_np = true_label_weak_masked[0].cpu().detach().numpy()
-    pseudo_label_weak_masked_np = pseudo_label_weak_masked[0].cpu().detach().numpy()
-    pred_x_masked_np = pred_x_masked[0, 0, :].cpu().detach().numpy()
-    pred_u_masked_np = pred_u_masked[0, 0, :].cpu().detach().numpy()
-
-    fig, axes = plt.subplots(2, 2)
-
-    axes[0, 0].imshow(true_label_weak_masked_np, cmap='viridis')
-    axes[0, 0].set_title('True Label Weak Masked')
-
-    axes[0, 1].imshow(pseudo_label_weak_masked_np, cmap='viridis')
-    axes[0, 1].set_title('Pseudo Label Weak Masked')
-
-    axes[1, 0].imshow(pred_x_masked_np, cmap='viridis')
-    axes[1, 0].set_title('Pred X Masked')
-
-    axes[1, 1].imshow(pred_u_masked_np, cmap='viridis')
-    axes[1, 1].set_title('Pred U Masked')
-
-    # Hide the axes
-    for ax in axes.flatten():
-        ax.axis('off')
-
-    plt.show()
-    exit()
-
-    true_label_weak_masked_np = true_label_weak_masked_[0].cpu().detach().numpy()
-    pseudo_label_weak_masked_np = pseudo_label_weak_masked_[0].cpu().detach().numpy()
-    pred_x_masked_np = pred_x_masked_[0, 0, :].cpu().detach().numpy()
-    pred_u_masked_np = pred_u_masked_[0, 0, :].cpu().detach().numpy()
-
-    # Plot side by side
-
-    fig, axes = plt.subplots(2, 2)
-
-    axes[0, 0].imshow(true_label_weak_masked_np, cmap='viridis')
-    axes[0, 0].set_title('True Label Weak Masked')
-
-    axes[0, 1].imshow(pseudo_label_weak_masked_np, cmap='viridis')
-    axes[0, 1].set_title('Pseudo Label Weak Masked')
-
-    axes[1, 0].imshow(pred_x_masked_np, cmap='viridis')
-    axes[1, 0].set_title('Pred X Masked')
-
-    axes[1, 1].imshow(pred_u_masked_np, cmap='viridis')
-    axes[1, 1].set_title('Pred U Masked')
-
-    # Hide the axes
-    for ax in axes.flatten():
-        ax.axis('off')
-
-    plt.show()
-    exit()
+def mask_reconstruction_loss(true_label_weak_masked, pseudo_label_weak_masked, pred_x_masked, pred_u_masked, mask):
+    true_label_weak_masked_ = true_label_weak_masked * (1 - mask.squeeze(dim=1))
+    pseudo_label_weak_masked_ = pseudo_label_weak_masked * (1 - mask.squeeze(dim=1))
+    pred_x_masked_ = pred_x_masked * (1 - mask)
+    pred_u_masked_ = pred_u_masked * (1 - mask)
 
     loss = nn.CrossEntropyLoss(ignore_index=255).cuda()
     loss_mask_reconstruction_l = loss(pred_x_masked_, true_label_weak_masked_)
     loss_mask_reconstruction_u = loss(pred_u_masked_, pseudo_label_weak_masked_)
-    return (loss_mask_reconstruction_l + loss_mask_reconstruction_u) / 2
+    return loss_mask_reconstruction_l + loss_mask_reconstruction_u
+
+
+transform = A.Compose([
+        A.ColorJitter(0.5, 0.5, 0.5, 0.25, p=0.8),
+        A.ToGray(p=0.2),
+        A.Blur(p=0.5),
+        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), always_apply=True, p=1.0),
+        ToTensorV2(transpose_mask=True),
+])
+
+def transform_func(image):
+    transformed = transform(image=np.transpose(image.cpu().numpy(), axes=(1, 2, 0)))
+    return transformed['image']
 
 def main():
     args = parser.parse_args()
@@ -234,7 +189,7 @@ def main():
             model.train()
             loss_mask = 0
             if cfg["multi-tasks"]["mask"]:
-                mask = torch.randint(0, 2, (img_u_s.shape[0], 1, img_u_s.shape[2], img_u_s.shape[3]))
+                mask = torch.randint(0, 2, (img_u_s.shape[0], 1, img_u_s.shape[2], img_u_s.shape[3])).cuda()
                 img_u_weak_masked = img_u_s * mask
                 img_x_weak_masked = img_x * mask
                 num_lb_masked, num_ulb_masked = img_x_weak_masked.shape[0], img_u_weak_masked.shape[0]
@@ -243,21 +198,23 @@ def main():
                 pred_x_masked, pred_u_masked = preds_masked.split([num_lb_masked, num_ulb_masked])
 
                 loss_mask = mask_reconstruction_loss(mask_x, pseudo_label, pred_x_masked,
-                                                     pred_u_masked, mask, cfg["multi-tasks"]["mask"]["bool"])
+                                                     pred_u_masked, mask)
                 del preds_masked
                 del pred_x_masked, pred_u_masked
 
+            img_x_strong = torch.stack([transform_func(img) for img in img_x_weak]).cuda()
+            img_u_s_strong = torch.stack([transform_func(img) for img in img_u_s_weak]).cuda()
 
             num_lb, num_ulb = img_x.shape[0], img_u_s.shape[0]
-            preds = model(torch.cat((img_x, img_u_s)))
+            preds = model(torch.cat((img_x_strong, img_u_s_strong)))
             pred_x, pred_u = preds.split([num_lb, num_ulb])
 
             loss_entropy = entropy_loss(pred_u, cfg["batch_size"], cfg["multi-tasks"]["entropy"]["bool"])
 
             loss_x = criterion_l(pred_x, mask_x)
-            loss_u = criterion_u(pred_u, pseudo_label) + cfg["multi-tasks"]["entropy"]["loss_factor"] * loss_entropy + cfg["multi-tasks"]["mask"]["loss_factor"] * loss_mask
+            loss_u = criterion_u(pred_u, pseudo_label)
             
-            loss = (loss_x + loss_u) / 2.0
+            loss = 0.5 * loss_x + 0.5 * loss_u + cfg["multi-tasks"]["entropy"]["loss_factor"] * loss_entropy + cfg["multi-tasks"]["mask"]["loss_factor"] * loss_mask
 
             optimizer.zero_grad()
             loss.backward()
