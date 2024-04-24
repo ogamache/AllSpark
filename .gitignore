@@ -4,5 +4,6 @@ cityscapes/
 VOC2012/
 coco/
 potsdam/
+potsdam_bckp/
 
 __pycache__/

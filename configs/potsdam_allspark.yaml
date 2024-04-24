@@ -5,18 +5,18 @@ crop_size: 513
 data_root: ./potsdam
 
 # arguments for training
-epochs: 200
+epochs: 100
 batch_size: 2 # per GPU x 4 GPUs
 lr: 0.001
 lr_multi: 10.0
 
 multi-tasks:
   entropy:
-    bool: True
-    loss_factor: 0.02
+    bool: False
+    loss_factor: 0.01
   mask:
     bool: False
-    loss_factor: 0.1
+    loss_factor: 0.01
 
 criterion:
   name: CELoss

@@ -16,7 +16,7 @@ now=$(date +"%Y%m%d_%H%M%S")
 
 dataset='potsdam'
 method='allspark'
-split='1_2_patch'
+split='1_2_513'
 version='0'
 
 

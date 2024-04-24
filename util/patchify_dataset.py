@@ -11,8 +11,8 @@ image_folders_path = "./potsdam/2_Ortho_RGB/"
 gt_folders_path = "./potsdam/5_Labels_all/"
 size_patches = 513
 
-output_images_folder_path = "./potsdam/2_Ortho_RGB_patches/"
-output_gt_folder_path = "./potsdam/5_Labels_all_patches/"
+output_images_folder_path = "./potsdam/2_Ortho_RGB_513/"
+output_gt_folder_path = "./potsdam/5_Labels_all_513/"
 verify_if_folder_exist_or_create_it(output_images_folder_path)
 verify_if_folder_exist_or_create_it(output_gt_folder_path)
 

@@ -5,3 +5,4 @@ einops
 timm
 protobuf==4.25.3
 albumentations
+matplotlib
