@@ -228,7 +228,6 @@ def main():
             total_loss_u.update(loss_u.item())
             total_loss_entropy.update(loss_entropy.item())
             total_loss_mask.update(loss_mask.item())
-            logger.info(loss_mask.item())
 
             iters = epoch * len(trainloader_u) + i
             lr = cfg['lr'] * (1 - iters / total_iters) ** 0.9
