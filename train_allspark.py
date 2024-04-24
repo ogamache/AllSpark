@@ -165,6 +165,8 @@ def main():
         total_loss = AverageMeter()
         total_loss_x = AverageMeter()
         total_loss_u = AverageMeter()
+        total_loss_entropy = AverageMeter()
+        total_loss_mask = AverageMeter()
 
         # trainloader_l.sampler.set_epoch(epoch)
         # trainloader_u.sampler.set_epoch(epoch)
@@ -187,8 +189,7 @@ def main():
 
 
             model.train()
-            loss_mask = 0
-            if cfg["multi-tasks"]["mask"]:
+            if cfg["multi-tasks"]["mask"]["bool"]:
                 mask = torch.randint(0, 2, (img_u_s.shape[0], 1, img_u_s.shape[2], img_u_s.shape[3])).cuda()
                 img_u_weak_masked = img_u_s * mask
                 img_x_weak_masked = img_x * mask
@@ -201,6 +202,8 @@ def main():
                                                      pred_u_masked, mask)
                 del preds_masked
                 del pred_x_masked, pred_u_masked
+            else:
+                loss_mask = torch.tensor(0)
 
             img_x_strong = torch.stack([transform_func(img) for img in img_x_weak]).cuda()
             img_u_s_strong = torch.stack([transform_func(img) for img in img_u_s_weak]).cuda()
@@ -223,6 +226,9 @@ def main():
             total_loss.update(loss.item())
             total_loss_x.update(loss_x.item())
             total_loss_u.update(loss_u.item())
+            total_loss_entropy.update(loss_entropy.item())
+            total_loss_mask.update(loss_mask.item())
+            logger.info(loss_mask.item())
 
             iters = epoch * len(trainloader_u) + i
             lr = cfg['lr'] * (1 - iters / total_iters) ** 0.9
@@ -237,8 +243,8 @@ def main():
                 writer.add_scalar('train/loss_mask', loss_mask.item(), iters)
 
             if (i % (len(trainloader_u) // 8) == 0) and (rank == 0):
-                logger.info('Iters: {:}, Total loss: {:.3f}, Loss x: {:.3f}, Loss u: {:.3f}'
-                            .format(i, total_loss.avg, total_loss_x.avg, total_loss_u.avg))
+                logger.info('Iters: {:}, Total loss: {:.3f}, Loss x: {:.3f}, Loss u: {:.3f}, Loss ent: {:.3f}, Loss mask: {:.3f}'
+                            .format(i, total_loss.avg, total_loss_x.avg, total_loss_u.avg, total_loss_entropy.avg, total_loss_mask.avg))
         model.decoder.set_SMem_status(epoch=epoch, isVal=True)
         eval_mode = 'sliding_window' if (cfg['dataset'] == 'cityscapes' or cfg['dataset'] == 'potsdam') else 'original'
         mIoU, iou_class, loss_val = evaluate(model, valloader, eval_mode, cfg, criterion_l)
