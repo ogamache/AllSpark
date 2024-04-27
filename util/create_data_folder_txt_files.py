@@ -5,9 +5,10 @@ import os
 from utils import verify_if_folder_exist_or_create_it
 
 dataset = "potsdam"
-split_name = "1_2_513"
-path_images = "2_Ortho_RGB_513/"
-path_gts  = "5_Labels_all_513/"
+size_patches = 925
+split_name = f"1_2_{size_patches}"
+path_images = f"2_Ortho_RGB_{size_patches}/"
+path_gts  = f"5_Labels_all_{size_patches}/"
 train_percentage = 0.8
 label_percentage = 0.5
 

@@ -9,10 +9,10 @@ from utils import verify_if_folder_exist_or_create_it
 #Create the paths to the folders, list the directory in the large image folder
 image_folders_path = "./potsdam/2_Ortho_RGB/"
 gt_folders_path = "./potsdam/5_Labels_all/"
-size_patches = 513
+size_patches = 925
 
-output_images_folder_path = "./potsdam/2_Ortho_RGB_513/"
-output_gt_folder_path = "./potsdam/5_Labels_all_513/"
+output_images_folder_path = f"./potsdam/2_Ortho_RGB_{size_patches}/"
+output_gt_folder_path = f"./potsdam/5_Labels_all_{size_patches}/"
 verify_if_folder_exist_or_create_it(output_images_folder_path)
 verify_if_folder_exist_or_create_it(output_gt_folder_path)
 
