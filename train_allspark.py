@@ -22,11 +22,13 @@ from model.model_helper import ModelBuilder
 import matplotlib.pyplot as plt
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
+import cv2
 
 parser = argparse.ArgumentParser(description='Revisiting Weak-to-Strong Consistency in Semi-Supervised Semantic Segmentation')
 parser.add_argument('--config', type=str, required=True)
 parser.add_argument('--labeled-id-path', type=str, required=True)
 parser.add_argument('--unlabeled-id-path', type=str, required=True)
+parser.add_argument('--val-id-path', type=str, required=True)
 parser.add_argument('--save-path', type=str, required=True)
 parser.add_argument('--local_rank', default=0, type=int)
 # parser.add_argument('--port', default=None, type=int, required=False)
@@ -62,11 +64,31 @@ transform = A.Compose([
         A.ToGray(p=0.2),
         A.Blur(p=0.5),
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), always_apply=True, p=1.0),
-        ToTensorV2(transpose_mask=True),
+        ToTensorV2(),
 ])
 
+def denormalize(image):
+    max_value = 255.0
+    # m, s = np.ones((513,513,3), dtype=np.float32), np.ones((513,513,3), dtype=np.float32)
+    m, s = np.ones((513,513,3), dtype=np.float32), np.ones((513,513,3), dtype=np.float32)
+    m[:,:,0] *= 0.485
+    m[:,:,1] *= 0.456
+    m[:,:,2] *= 0.406
+    s[:,:,0] *= 0.229
+    s[:,:,1] *= 0.224
+    s[:,:,2] *= 0.225
+    img_denorm = np.float32(image)*s + m
+    img_denorm = np.clip(img_denorm, 0.0, 1.0)
+    img_denorm = (img_denorm*max_value).astype(np.uint8)
+    # cv2.imshow("image", img_denorm)
+    # cv2.waitKey()
+    # cv2.destroyAllWindows()
+    # exit()
+    return img_denorm
+
 def transform_func(image):
-    transformed = transform(image=np.transpose(image.cpu().numpy(), axes=(1, 2, 0)))
+    image_denorm = denormalize(np.transpose(image, axes=(1, 2, 0)))
+    transformed = transform(image=image_denorm)
     return transformed['image']
 
 def main():
@@ -125,7 +147,7 @@ def main():
                             cfg['crop_size'], args.unlabeled_id_path)
     trainset_l_weak = SemiDatasetWeak(cfg['dataset'], cfg['data_root'], 'train_l',
                             cfg['crop_size'], args.labeled_id_path, nsample=len(trainset_u_weak.ids))
-    valset = SemiDataset(cfg['dataset'], cfg['data_root'], 'val')
+    valset = SemiDataset(cfg['dataset'], cfg['data_root'], mode='val', id_path=args.val_id_path)
 
     # trainsampler_l = torch.utils.data.distributed.DistributedSampler(trainset_l)
     trainloader_l = DataLoader(trainset_l, batch_size=cfg['batch_size'],
@@ -206,10 +228,11 @@ def main():
                 loss_mask = torch.tensor(0)
 
             img_x_strong = torch.stack([transform_func(img) for img in img_x_weak]).cuda()
-            img_u_s_strong = torch.stack([transform_func(img) for img in img_u_s_weak]).cuda()
+            # img_u_s_strong = torch.stack([transform_func(img) for img in img_u_s_weak]).cuda()
 
             num_lb, num_ulb = img_x.shape[0], img_u_s.shape[0]
-            preds = model(torch.cat((img_x_strong, img_u_s_strong)))
+            preds = model(torch.cat((img_x_strong, img_u_s)))
+            # preds = model(torch.cat((img_x, img_u_s)))
             pred_x, pred_u = preds.split([num_lb, num_ulb])
 
             loss_entropy = entropy_loss(pred_u, cfg["batch_size"], cfg["multi-tasks"]["entropy"]["bool"])
