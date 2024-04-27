@@ -39,7 +39,8 @@ class SemiDataset(Dataset):
                 self.ids *= math.ceil(nsample / len(self.ids))
                 self.ids = self.ids[:nsample]
         else:
-            with open('splits/%s/val.txt' % name, 'r') as f:
+            # with open('splits/%s/val.txt' % name, 'r') as f:
+            with open(id_path, 'r') as f:
                 self.ids = f.read().splitlines()
 
     def __getitem__(self, item):

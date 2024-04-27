@@ -17,13 +17,14 @@ now=$(date +"%Y%m%d_%H%M%S")
 dataset='potsdam'
 method='allspark'
 split='1_2_513'
-version='0'
+experiment='le_0.1'
 
 
 config=configs/${dataset}_${method}.yaml
 labeled_id_path=splits/$dataset/$split/labeled.txt
 unlabeled_id_path=splits/$dataset/$split/unlabeled.txt
-save_path=exp/$dataset/$method/$split"_v"$version
+val_id_path=splits/$dataset/$split/val.txt
+save_path=exp/$dataset/$method/$split"_"$experiment
 
 mkdir -p $save_path
 
@@ -34,5 +35,5 @@ mkdir -p $save_path
 export LOCAL_RANK=0
 export PYTHONPATH=..
 python3 train_$method.py \
-    --config=$config --labeled-id-path $labeled_id_path --unlabeled-id-path $unlabeled_id_path \
+    --config=$config --labeled-id-path $labeled_id_path --unlabeled-id-path $unlabeled_id_path --val-id-path $val_id_path \
     --save-path $save_path 2>&1 | tee $save_path/$now.log

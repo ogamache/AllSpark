@@ -19,11 +19,13 @@ class SemiDatasetWeak(Dataset):
         self.transform_data_augmentation = A.Compose(
             [
                 A.RandomSizedCrop((256,513), (513,513), p=self.probability_transform),
+                # A.RandomSizedCrop((513,513), (513,513), p=self.probability_transform),
                 A.HorizontalFlip(p=self.probability_transform),
                 A.VerticalFlip(p=self.probability_transform),
                 A.Rotate(p=self.probability_transform),
                 A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), always_apply=True, p=1.0),
-                ToTensorV2(transpose_mask=True),
+                # ToTensorV2(transpose_mask=True),
+                ToTensorV2(),
             ], p=1.0
         )
         self.transform_normalize = A.Compose(
