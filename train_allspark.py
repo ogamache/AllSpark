@@ -22,6 +22,8 @@ from model.model_helper import ModelBuilder
 import matplotlib.pyplot as plt
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
+import math
+import torch.nn.functional as F
 import cv2
 
 parser = argparse.ArgumentParser(description='Revisiting Weak-to-Strong Consistency in Semi-Supervised Semantic Segmentation')
@@ -212,7 +214,20 @@ def main():
 
             model.train()
             if cfg["multi-tasks"]["mask"]["bool"]:
-                mask = torch.randint(0, 2, (img_u_s.shape[0], 1, img_u_s.shape[2], img_u_s.shape[3])).cuda()
+                patch_size = (36, 36)
+                num_patches = (math.ceil(img_u_s.shape[2] / patch_size[0]), math.ceil(img_u_s.shape[3] / patch_size[1]))
+                mask_patches = torch.randint(0, 2, (img_u_s.shape[0], 1, num_patches[0], num_patches[1])).cuda()
+                mask = F.interpolate(mask_patches.float(), size=(img_u_s.shape[2], img_u_s.shape[3]), mode='nearest')
+                mask = torch.round(mask)
+                mask = mask.to(torch.int)
+                mask = mask[:, :, :img_u_s.shape[2], :img_u_s.shape[3]]
+                # plt.imshow(np.transpose(mask[0].cpu().numpy(), axes=(1, 2, 0)))
+                # plt.show()
+                # plt.imshow(np.transpose(mask[1].cpu().numpy(), axes=(1, 2, 0)))
+                # plt.show()
+                # exit()
+
+                # mask = torch.randint(0, 2, (img_u_s.shape[0], 1, img_u_s.shape[2], img_u_s.shape[3])).cuda()
                 img_u_weak_masked = img_u_s * mask
                 img_x_weak_masked = img_x * mask
                 num_lb_masked, num_ulb_masked = img_x_weak_masked.shape[0], img_u_weak_masked.shape[0]
