@@ -17,7 +17,7 @@ now=$(date +"%Y%m%d_%H%M%S")
 dataset='potsdam'
 method='allspark'
 split='1_2_513'
-experiment='le_0.1'
+experiment='le_0.05'
 
 
 config=configs/${dataset}_${method}.yaml
